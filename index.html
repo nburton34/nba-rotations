@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NBA Rotations</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">NBA Rotations <span id="season" class="muted"></span></div>
+    <div class="meta muted" id="meta"></div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <section class="games-bar side-card" id="gamesBar">
+        <div class="side-head">
+          <h2>Games</h2>
+          <button class="board-toggle" id="boardToggle" title="Who has been ruled out, for every team">Ruled out</button>
+        </div>
+        <div class="day-nav" id="dayNav"></div>
+        <div id="dayGames" class="day-games"></div>
+      </section>
+      <input id="teamSearch" type="search" placeholder="Find a team…" autocomplete="off">
+      <div id="standings"></div>
+    </aside>
+
+    <main id="main">
+      <nav id="tabs" class="tabs" hidden></nav>
+      <div id="panels"></div>
+      <section class="card welcome" id="welcome" hidden>
+        <h1>Pick a team or a game to get started</h1>
+        <p class="muted">Nothing is selected yet.</p>
+        <ul>
+          <li><b>Select a game</b> in <b>Games</b> at the top left to see both teams side by side: lineups, injuries and rotations.</li>
+          <li><b>Select a team</b> in the standings (or type in <b>Find a team…</b>) to open that team.</li>
+          <li>Use <b>+</b> next to a team in the standings to open several teams at once.</li>
+          <li><b>Ruled out</b> (next to Games) shows who is out for every team today.</li>
+        </ul>
+      </section>
+    </main>
+
+    <template id="panelTpl">
+      <div class="panel">
+        <section class="card team-head">
+          <div>
+            <h1 data-el="teamName"></h1>
+            <div data-el="teamSummary" class="muted"></div>
+          </div>
+          <button class="link close-panel" data-el="closePanel" title="Remove this team from the view">✕ Close</button>
+          <div data-el="filters" class="filters"></div>
+        </section>
+
+        <section class="card lineup-card">
+          <div class="card-head">
+            <h2 data-el="lineupTitle"></h2>
+            <span class="muted" data-el="lineupMeta"></span>
+          </div>
+          <div class="lineup-grid">
+            <div><h3>Starting five</h3><table class="analysis" data-el="lineupTable"></table></div>
+            <div><h3>Injury report</h3><div data-el="injuryList" class="inj-list"></div></div>
+          </div>
+          <ul data-el="lineupNotes" class="insights lineup-notes"></ul>
+        </section>
+
+        <section class="card returns-card">
+          <div class="card-head">
+            <h2>Returns &amp; minutes limits</h2>
+            <span class="muted">Long absences count last season's missed games too · restrictions from ESPN news and injury notes</span>
+          </div>
+          <div data-el="returnsBody"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Rotation heatmap</h2>
+            <span class="muted" data-el="heatCaption"></span>
+            <div class="heat-tools">
+              <div class="seg" title="Label each quarter's minutes">
+                <button data-mm="clock" title="Game clock: 12 = the minute from 12:00 to 11:00, down to 1 = 1:00 to 0:00">Clock 12–1</button><button data-mm="count" title="Minute count: 1 = first minute of the quarter, up to 12 = last minute">Minutes 1–12</button>
+              </div>
+              <div class="seg"><button data-el="numToggle" title="Show the value inside each minute">Numbers</button></div>
+            </div>
+          </div>
+          <div data-el="heatmap" class="rot"></div>
+          <div class="legend" data-el="legend"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Rotation analysis</h2>
+            <span class="muted">Based on the selected games</span>
+          </div>
+          <div data-el="teamInsights" class="glance"></div>
+          <div class="rot"><table class="analysis compact-analysis" data-el="analysis"></table></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Trends</h2>
+            <span class="muted">Full season, game by game &middot; not affected by filters</span>
+          </div>
+          <div data-el="trendInsights" class="glance"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Pulling starters</h2>
+            <span class="muted">When do they empty the bench in blowouts? &middot; full season</span>
+          </div>
+          <div data-el="pullBody"></div>
+        </section>
+
+        <section class="card" data-el="gameCard" hidden>
+          <div class="card-head">
+            <h2 data-el="gameTitle"></h2>
+            <button class="link" data-el="closeGame">Back to season view</button>
+          </div>
+          <div data-el="gameChart" class="rot"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Game log</h2>
+            <span class="muted">Click a game to see its rotation</span>
+          </div>
+          <table class="gamelog" data-el="gamelog"></table>
+        </section>
+      </div>
+    </template>
+  </div>
+
+  <div id="outBoard" class="out-board drawer" hidden></div>
+  <div id="tooltip" class="tooltip" hidden></div>
+
+  <footer class="muted">
+    Data from <a href="https://nbarotations.info/" target="_blank" rel="noopener">nbarotations.info</a>
+    by Phil Roth (sourced from stats.nba.com) · lineups &amp; injury reports from NBA.com · schedule, rosters &amp; injury notes from ESPN.
+    Refreshed every 15 minutes through the day; the page reloads itself when new data arrives.
+  </footer>
+
+  <script>
+    // Load the data named by its version stamp, so a cached old copy is never reused after an update
+    // (the host caches files for several minutes). Falls back to plain names if stamp.js is missing.
+    (function () {
+      function load(src, next) {
+        var s = document.createElement("script");
+        s.src = src; s.onload = next; s.onerror = next;
+        document.body.appendChild(s);
+      }
+      load("stamp.js?t=" + Date.now(), function () {
+        var v = encodeURIComponent(window.DATA_STAMP || Date.now());
+        load("data.js?v=" + v, function () { load("app.js?v=" + v, function () {}); });
+      });
+    })();
+  </script>
+</body>
+</html>
